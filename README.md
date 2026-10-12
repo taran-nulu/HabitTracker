@@ -19,42 +19,69 @@ Habits are laid out as a month calendar — one row per habit, one column per da
 - macOS 11 or newer
 - Python 3.9+ (developed against 3.13)
 
-## Run from source
+## Install
+
+```bash
+make install
+```
+
+Builds the app and installs it to `/Applications`, ready to launch and pin to the Dock. See [Install the app](#install-the-app) for details, and [Updating an existing install](#updating-an-existing-install) if you have already installed it once.
+
+To run straight from source instead:
 
 ```bash
 make setup     # creates .venv and installs dependencies
 make run       # launches the app
 ```
 
-## Build the .app
+## Install the app
 
 ```bash
-make build     # -> dist/Habit Tracker.app
-make install   # rebuilds, replaces the copy in /Applications, re-signs
+make install
 ```
 
-After `make install`, open **Applications → Habit Tracker**. Right-click its icon in the Dock and choose **Options → Keep in Dock** to pin it permanently.
+That is the whole command. It builds the app, replaces the copy in `/Applications`, and re-signs it. When it finishes, the app is ready to launch:
 
-### Recompiling after changes
+1. Open **Applications → Habit Tracker**.
+2. Right-click its icon in the Dock and choose **Options → Keep in Dock** to pin it permanently.
 
-`make build` depends on `setup` and `icon`, so it reinstalls dependencies and regenerates the icon automatically before packaging. `make install` depends on `build`, so it covers everything in one step.
+If macOS shows a "cannot verify developer" prompt, right-click the app and choose **Open** once to approve it. The app is ad-hoc signed, so this only happens the first time.
+
+If you only want the bundle without installing it, `make build` leaves it at `dist/Habit Tracker.app`.
+
+## Updating an existing install
+
+Run the same command again after changing anything:
+
+```bash
+make install
+```
 
 | You changed | Command |
 | --- | --- |
 | Python code (`habit_tracker/*.py`, `main.py`) | `make install` |
-| `app_icon.PNG` | `make install` |
+| `app_icon.PNG` (the Dock icon) | `make install` |
 | `requirements.txt` | `make install` |
 | `setup.py` (bundle name, version) | `make clean install` |
 
-While iterating on code, `make run` is faster than a full rebuild — it launches straight from source and shares the same data file as the bundled app.
+You never need to download anything — the app is built from this source tree on your Mac, so updating is just rebuilding.
 
-`make install` deletes the existing app in `/Applications` before copying, so files from an older build can't linger. It then re-signs the copy, since moving or modifying a bundle invalidates its signature. If macOS refuses to replace the app, quit the running copy first.
+Notes:
 
-The build is ad-hoc signed, which is enough to run locally. macOS may still show a "cannot verify developer" prompt the first time if the app was moved between locations; right-click the app and choose **Open** once to approve it.
+- **Quit the app before installing.** If it is running, macOS may refuse to replace it.
+- `make install` deletes the existing app before copying, so files from an older build cannot linger, and your progress is never lost (it lives outside the bundle — see below).
+- `make install` depends on `make build`, which in turn depends on `make setup` and `make icon`. Dependencies are reinstalled and the icon is regenerated on every build, automatically.
+- While iterating on code, `make run` is much faster than a full rebuild — it launches straight from source and uses the same data file as the installed app.
+
+To see what a target will do without running it, use `make -n install`.
 
 ### How the icon is handled
 
-`app_icon.PNG` is the single source of truth. `tools/make_icon.sh` converts it into a multi-resolution `HabitTracker.icns` at build time using macOS's built-in `sips` and `iconutil`. The generated `.icns` is a build artifact and is git-ignored — replace `app_icon.PNG` and re-run `make icon` (or just `make build`) to change the Dock icon.
+The `app_icon` file is the single source of truth. `tools/make_icon.sh` converts it into a multi-resolution `HabitTracker.icns` at build time using macOS's built-in `sips` and `iconutil`, then the bundle embeds that as its Dock icon.
+
+The script accepts `app_icon.PNG`, `app_icon.png`, `app_icon.jpg`, `app_icon.jpeg`, or `app_icon` regardless of the file's real format, so replacing the icon with a differently-named or differently-encoded file works without touching any code. The generated `.icns` is a build artifact and is git-ignored — edit the source icon and re-run `make install`.
+
+For the most native look, supply a square image **with a transparent background**. Icons without an alpha channel render as plain squares in the Dock.
 
 ## Where your data lives
 
