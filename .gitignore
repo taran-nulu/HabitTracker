@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# py2app build output
+build/
+dist/
+
+# Generated from app_icon.PNG by tools/make_icon.sh
+HabitTracker.icns
+*.iconset/
+
+# macOS
+.DS_Store

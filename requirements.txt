@@ -1,0 +1,2 @@
+customtkinter>=5.2.2
+py2app>=0.28.9
