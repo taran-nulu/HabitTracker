@@ -8,7 +8,7 @@ Habits are laid out as a month calendar — one row per habit, one column per da
 
 - Month grid with click-to-toggle day cells
 - Add, rename and delete habits (delete asks for confirmation)
-- Current streak badge per habit
+- Current streak and longest-ever streak per habit
 - Previous / next month navigation and a `Today` jump
 - Dark / light theme toggle
 - Progress saved automatically and restored on launch
@@ -116,5 +116,6 @@ Makefile                    setup / run / icon / build / install / clean
 ## Notes
 
 - Day cells in the future, or before a habit was created, are dimmed and not clickable.
+- Each habit shows two badges: its current streak (`5d`) and its longest streak ever (`best 12d`). The current streak survives an unticked today, and only breaks once a whole day is missed.
 - Toggling a day saves after a short debounce rather than on every click.
 - The window auto-sizes so a full 31-day month is never squeezed.

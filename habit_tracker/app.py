@@ -17,8 +17,12 @@ DAY_CELL_H = 26
 HEADER_H = 20
 HABIT_COL_W = 210
 
-# Fixed chrome inside the habit column: colour dot, gaps, streak badge, Edit.
-NAME_CHROME_W = 12 + 2 + 8 + 42 + 4 + 44 + 4
+# Fixed chrome inside the habit column: colour dot, gaps, streak badges, Edit.
+DOT_W = 12
+CURRENT_BADGE_W = 42
+BEST_BADGE_W = 52
+EDIT_BTN_W = 44
+NAME_CHROME_W = DOT_W + 2 + 8 + CURRENT_BADGE_W + 4 + BEST_BADGE_W + 4 + EDIT_BTN_W + 4
 
 # Horizontal padding around each day cell. Must be identical for the header
 # labels and the day buttons, or the columns drift apart across the month.
@@ -67,6 +71,7 @@ class HabitApp(ctk.CTk):
         self._day_col_w = DAY_CELL_W
         self._day_buttons: dict[tuple[str, str], ctk.CTkButton] = {}
         self._streak_labels: dict[str, ctk.CTkLabel] = {}
+        self._best_labels: dict[str, ctk.CTkLabel] = {}
         self._habit_menus: dict[str, tk.Menu] = {}
 
         self._configure_layout()
@@ -223,6 +228,7 @@ class HabitApp(ctk.CTk):
             child.destroy()
         self._day_buttons.clear()
         self._streak_labels.clear()
+        self._best_labels.clear()
         self._habit_menus.clear()
 
         self.month_label.configure(
@@ -375,7 +381,7 @@ class HabitApp(ctk.CTk):
         dot = ctk.CTkLabel(
             name_cell,
             text="",
-            width=12,
+            width=DOT_W,
             height=12,
             corner_radius=6,
             fg_color=habit.color,
@@ -392,12 +398,12 @@ class HabitApp(ctk.CTk):
         )
         name_label.grid(row=0, column=1, padx=(8, 0), sticky="w")
 
-        # --- streak badge ---
+        # --- streak badges: current run, then the longest run ever ---
         streak = self.store.current_streak(habit.id)
         streak_label = ctk.CTkLabel(
             name_cell,
             text=f"{streak}d" if streak else "-",
-            width=42,
+            width=CURRENT_BADGE_W,
             height=22,
             corner_radius=11,
             font=ctk.CTkFont(size=11, weight="bold"),
@@ -407,11 +413,25 @@ class HabitApp(ctk.CTk):
         streak_label.grid(row=0, column=2, padx=(4, 0))
         self._streak_labels[habit.id] = streak_label
 
+        best = self.store.best_streak(habit.id)
+        best_label = ctk.CTkLabel(
+            name_cell,
+            text=f"best {best}d" if best else "best -",
+            width=BEST_BADGE_W,
+            height=22,
+            corner_radius=11,
+            font=ctk.CTkFont(size=11),
+            text_color=C_MUTED,
+            fg_color="transparent",
+        )
+        best_label.grid(row=0, column=3, padx=(4, 0))
+        self._best_labels[habit.id] = best_label
+
         menu = self._build_habit_menu(habit)
         ctk.CTkButton(
             name_cell,
             text="Edit",
-            width=44,
+            width=EDIT_BTN_W,
             height=24,
             corner_radius=6,
             font=ctk.CTkFont(size=11),
@@ -421,7 +441,7 @@ class HabitApp(ctk.CTk):
             command=lambda h=habit, m=menu: m.post(
                 self.winfo_pointerx(), self.winfo_pointery()
             ),
-        ).grid(row=0, column=3, padx=(4, 0))
+        ).grid(row=0, column=4, padx=(4, 0))
 
         name_cell.bind("<Button-3>", lambda e, m=menu: m.post(e.x_root, e.y_root))
 
@@ -477,14 +497,21 @@ class HabitApp(ctk.CTk):
         self._schedule_save()
 
     def _refresh_streak(self, habit) -> None:
+        """Update the current-streak and best-streak badges for one habit."""
         label = self._streak_labels.get(habit.id)
-        if label is None:
-            return
-        streak = self.store.current_streak(habit.id)
-        if streak:
-            label.configure(text=f"{streak}d", fg_color=habit.color, text_color="#ffffff")
-        else:
-            label.configure(text="-", fg_color="transparent", text_color=C_MUTED)
+        if label is not None:
+            streak = self.store.current_streak(habit.id)
+            if streak:
+                label.configure(
+                    text=f"{streak}d", fg_color=habit.color, text_color="#ffffff"
+                )
+            else:
+                label.configure(text="-", fg_color="transparent", text_color=C_MUTED)
+
+        best_label = self._best_labels.get(habit.id)
+        if best_label is not None:
+            best = self.store.best_streak(habit.id)
+            best_label.configure(text=f"best {best}d" if best else "best -")
 
     def _update_summary(self, today: date) -> None:
         if not self.store.habits:
