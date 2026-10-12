@@ -24,7 +24,14 @@ DOT_W = 12
 CURRENT_BADGE_W = 42
 BEST_BADGE_W = 52
 EDIT_BTN_W = 44
-NAME_CHROME_W = DOT_W + 2 + 8 + CURRENT_BADGE_W + 4 + EDIT_BTN_W + 4
+# Gap between the current-streak badge and the Edit button. Must match the
+# right-hand padx used when the badge is gridded, or the name label is sized
+# against a stale width.
+STREAK_GAP_RIGHT = 8
+STREAK_GAP_LEFT = 1
+NAME_CHROME_W = (
+    DOT_W + 2 + 8 + CURRENT_BADGE_W + STREAK_GAP_LEFT + STREAK_GAP_RIGHT + EDIT_BTN_W + 4
+)
 
 # Horizontal padding around each day cell. Must be identical for the header
 # labels and the day buttons, or the columns drift apart across the month.
@@ -412,7 +419,12 @@ class HabitApp(ctk.CTk):
             text_color="#ffffff" if streak else C_MUTED,
             fg_color=habit.color if streak else "transparent",
         )
-        streak_label.grid(row=0, column=2, padx=(4, 0), pady=(2, 0))
+        streak_label.grid(
+            row=0,
+            column=2,
+            padx=(STREAK_GAP_LEFT, STREAK_GAP_RIGHT),
+            pady=(2, 0),
+        )
         self._streak_labels[habit.id] = streak_label
 
         # --- best streak badge, on its own row beneath the name ---
