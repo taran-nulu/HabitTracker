@@ -17,12 +17,14 @@ DAY_CELL_H = 26
 HEADER_H = 20
 HABIT_COL_W = 210
 
-# Fixed chrome inside the habit column: colour dot, gaps, streak badges, Edit.
+# Fixed chrome inside the habit column, measured across the NAME ROW only.
+# The best-streak badge sits on its own row underneath, so it adds height but
+# not width.
 DOT_W = 12
 CURRENT_BADGE_W = 42
 BEST_BADGE_W = 52
 EDIT_BTN_W = 44
-NAME_CHROME_W = DOT_W + 2 + 8 + CURRENT_BADGE_W + 4 + BEST_BADGE_W + 4 + EDIT_BTN_W + 4
+NAME_CHROME_W = DOT_W + 2 + 8 + CURRENT_BADGE_W + 4 + EDIT_BTN_W + 4
 
 # Horizontal padding around each day cell. Must be identical for the header
 # labels and the day buttons, or the columns drift apart across the month.
@@ -374,7 +376,7 @@ class HabitApp(ctk.CTk):
         row = index + 2  # rows 0-1 are the weekday/day-number header
         parent = self.grid_frame
 
-        # --- name cell ---
+        # --- name cell: two rows, with the best streak tucked under the name ---
         name_cell = ctk.CTkFrame(parent, fg_color="transparent")
         name_cell.grid(row=row, column=0, sticky="w")
 
@@ -386,7 +388,7 @@ class HabitApp(ctk.CTk):
             corner_radius=6,
             fg_color=habit.color,
         )
-        dot.grid(row=0, column=0, padx=(2, 0), pady=4)
+        dot.grid(row=0, column=0, padx=(2, 0), pady=(5, 0), sticky="n")
 
         name_label = ctk.CTkLabel(
             name_cell,
@@ -396,9 +398,9 @@ class HabitApp(ctk.CTk):
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=C_TEXT,
         )
-        name_label.grid(row=0, column=1, padx=(8, 0), sticky="w")
+        name_label.grid(row=0, column=1, padx=(8, 0), pady=(2, 0), sticky="w")
 
-        # --- streak badges: current run, then the longest run ever ---
+        # --- current streak badge, on the name row ---
         streak = self.store.current_streak(habit.id)
         streak_label = ctk.CTkLabel(
             name_cell,
@@ -410,21 +412,23 @@ class HabitApp(ctk.CTk):
             text_color="#ffffff" if streak else C_MUTED,
             fg_color=habit.color if streak else "transparent",
         )
-        streak_label.grid(row=0, column=2, padx=(4, 0))
+        streak_label.grid(row=0, column=2, padx=(4, 0), pady=(2, 0))
         self._streak_labels[habit.id] = streak_label
 
+        # --- best streak badge, on its own row beneath the name ---
         best = self.store.best_streak(habit.id)
         best_label = ctk.CTkLabel(
             name_cell,
             text=f"best {best}d" if best else "best -",
             width=BEST_BADGE_W,
-            height=22,
-            corner_radius=11,
-            font=ctk.CTkFont(size=11),
+            height=18,
+            corner_radius=9,
+            font=ctk.CTkFont(size=10),
             text_color=C_MUTED,
             fg_color="transparent",
         )
-        best_label.grid(row=0, column=3, padx=(4, 0))
+        # Indented to sit under the habit name rather than under the dot.
+        best_label.grid(row=1, column=1, padx=(8, 0), pady=(0, 6), sticky="w")
         self._best_labels[habit.id] = best_label
 
         menu = self._build_habit_menu(habit)
@@ -441,7 +445,7 @@ class HabitApp(ctk.CTk):
             command=lambda h=habit, m=menu: m.post(
                 self.winfo_pointerx(), self.winfo_pointery()
             ),
-        ).grid(row=0, column=4, padx=(4, 0))
+        ).grid(row=0, column=3, padx=(4, 0), pady=(2, 0))
 
         name_cell.bind("<Button-3>", lambda e, m=menu: m.post(e.x_root, e.y_root))
 
@@ -478,7 +482,7 @@ class HabitApp(ctk.CTk):
             command=None if (is_future or before_creation)
             else lambda h=habit, d=day_date: self._toggle_cell(h, d),
         )
-        button.grid(row=row, column=day, padx=DAY_PAD, pady=2)
+        button.grid(row=row, column=day, padx=DAY_PAD, pady=(4, 4))
         self._day_buttons[(habit.id, day_date.isoformat())] = button
 
     # --------------------------------------------------------- behaviour
