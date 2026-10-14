@@ -9,7 +9,7 @@ from datetime import date
 import customtkinter as ctk
 from tkinter import messagebox
 
-from .models import Store
+from .models import PALETTE, Store, normalize_color
 
 # Layout metrics (pixels, before CustomTkinter's scaling is applied).
 DAY_CELL_W = 30
@@ -29,6 +29,13 @@ EDIT_BTN_W = 44
 # against a stale width.
 STREAK_GAP_RIGHT = 8
 STREAK_GAP_LEFT = 1
+
+# Top padding that vertically centres each name-line widget against the day
+# cells, so the name, its dot, streak badge and Edit button all share a
+# baseline with the checkboxes beside them.
+STREAK_PADDY_Y = (DAY_CELL_H - 22) // 2   # streak badge is 22px tall
+DOT_PADDY_Y = (DAY_CELL_H - 16) // 2      # colour dot renders 16px tall
+EDIT_PADDY_Y = (DAY_CELL_H - 24) // 2    # Edit button is 24px tall
 NAME_CHROME_W = (
     DOT_W + 2 + 8 + CURRENT_BADGE_W + STREAK_GAP_LEFT + STREAK_GAP_RIGHT + EDIT_BTN_W + 4
 )
@@ -42,7 +49,7 @@ DAY_PAD = 1
 GRID_PADDING = 16 + 2 * 14
 WINDOW_PADDING_X = 2 * 18
 
-# Colours are (light_mode, dark_mode) tuples so CustomTkinter switches them
+# Colors are (light_mode, dark_mode) tuples so CustomTkinter switches them
 # automatically when the appearance mode changes.
 C_BG = ("#f2f3f5", "#1c1e22")
 C_CARD = ("#ffffff", "#25282d")
@@ -395,17 +402,20 @@ class HabitApp(ctk.CTk):
             corner_radius=6,
             fg_color=habit.color,
         )
-        dot.grid(row=0, column=0, padx=(2, 0), pady=(5, 0), sticky="n")
+        dot.grid(row=0, column=0, padx=(2, 0), pady=(DOT_PADDY_Y, 0), sticky="n")
 
         name_label = ctk.CTkLabel(
             name_cell,
             text=habit.name,
             anchor="w",
             width=self._habit_col_w - NAME_CHROME_W,
+            # Match the day-cell height so the name line and the checkboxes it
+            # labels share an identical baseline.
+            height=DAY_CELL_H,
             font=ctk.CTkFont(size=14, weight="bold"),
             text_color=C_TEXT,
         )
-        name_label.grid(row=0, column=1, padx=(8, 0), pady=(2, 0), sticky="w")
+        name_label.grid(row=0, column=1, padx=(8, 0), pady=(0, 0), sticky="w")
 
         # --- current streak badge, on the name row ---
         streak = self.store.current_streak(habit.id)
@@ -423,7 +433,8 @@ class HabitApp(ctk.CTk):
             row=0,
             column=2,
             padx=(STREAK_GAP_LEFT, STREAK_GAP_RIGHT),
-            pady=(2, 0),
+            pady=STREAK_PADDY_Y,
+            sticky="n",
         )
         self._streak_labels[habit.id] = streak_label
 
@@ -457,7 +468,7 @@ class HabitApp(ctk.CTk):
             command=lambda h=habit, m=menu: m.post(
                 self.winfo_pointerx(), self.winfo_pointery()
             ),
-        ).grid(row=0, column=3, padx=(4, 0), pady=(2, 0))
+        ).grid(row=0, column=3, padx=(4, 0), pady=(EDIT_PADDY_Y, 0), sticky="n")
 
         name_cell.bind("<Button-3>", lambda e, m=menu: m.post(e.x_root, e.y_root))
 
@@ -494,10 +505,10 @@ class HabitApp(ctk.CTk):
             command=None if (is_future or before_creation)
             else lambda h=habit, d=day_date: self._toggle_cell(h, d),
         )
-        button.grid(row=row, column=day, padx=DAY_PAD, pady=(4, 4))
+        button.grid(row=row, column=day, padx=DAY_PAD, pady=(0, 0), sticky="n")
         self._day_buttons[(habit.id, day_date.isoformat())] = button
 
-    # --------------------------------------------------------- behaviour
+    # --------------------------------------------------------- behavior
 
     def _toggle_cell(self, habit, day_date: date) -> None:
         done = self.store.toggle(habit.id, day_date)
@@ -558,23 +569,36 @@ class HabitApp(ctk.CTk):
     # ---------------------------------------------------------- habits
 
     def add_habit(self) -> None:
-        name = self._prompt("New Habit", "Habit name", "")
+        answer = self._prompt("New Habit", "Habit name", "", initial_color=PALETTE[0])
+        if not answer:
+            return
+        name, color = answer
         if not name:
             return
         try:
-            self.store.add_habit(name)
+            self.store.add_habit(name, color)
         except ValueError as exc:
             messagebox.showerror("Habit Tracker", str(exc), parent=self)
             return
         self.refresh()
         self._save()
 
-    def _rename_habit(self, habit) -> None:
-        name = self._prompt("Rename Habit", "Habit name", habit.name)
-        if not name or name == habit.name:
+    def _edit_habit(self, habit) -> None:
+        """Edit a habit's name and color together."""
+        answer = self._prompt(
+            "Edit Habit", "Habit name", habit.name, initial_color=habit.color
+        )
+        if not answer:
+            return
+        name, color = answer
+        if not name:
+            messagebox.showerror("Habit Tracker", "Habit name cannot be empty", parent=self)
             return
         try:
-            self.store.rename_habit(habit.id, name)
+            if name != habit.name:
+                self.store.rename_habit(habit.id, name)
+            if color and color != habit.color:
+                self.store.set_color(habit.id, color)
         except ValueError as exc:
             messagebox.showerror("Habit Tracker", str(exc), parent=self)
             return
@@ -596,21 +620,33 @@ class HabitApp(ctk.CTk):
 
     def _build_habit_menu(self, habit) -> tk.Menu:
         menu = tk.Menu(self, tearoff=0)
-        menu.add_command(label="Rename...", command=lambda: self._rename_habit(habit))
+        menu.add_command(label="Edit...", command=lambda: self._edit_habit(habit))
         menu.add_command(label="Delete...", command=lambda: self._delete_habit(habit))
         self._habit_menus[habit.id] = menu
         return menu
 
     # --------------------------------------------------------- dialogs
 
-    def _prompt(self, title: str, message: str, initial: str) -> str | None:
-        """Modal single-field prompt. Returns the text, or None if cancelled."""
+    def _prompt(
+        self,
+        title: str,
+        message: str,
+        initial: str,
+        initial_color: str | None = None,
+    ) -> tuple[str, str | None] | None:
+        """Modal prompt for a habit name and, optionally, its color.
+
+        Returns ``(name, color)`` on Save, or None if cancelled. ``color`` is
+        None when the caller did not ask for color selection, meaning "keep the
+        existing/automatic color".
+        """
         top = ctk.CTkToplevel(self)
         top.title(title)
         top.resizable(False, False)
         top.transient(self)
 
-        result: list[str | None] = [None]
+        result: list[tuple[str, str | None] | None] = [None]
+        chosen: list[str] = [initial_color] if initial_color else []
 
         panel = ctk.CTkFrame(top, fg_color="transparent")
         panel.pack(padx=22, pady=20)
@@ -639,11 +675,16 @@ class HabitApp(ctk.CTk):
         entry.pack()
         entry.focus_set()
 
+        color_widgets: list = []
+        if initial_color is not None:
+            color_widgets = self._build_color_picker(panel, initial_color, chosen)
+
         buttons = ctk.CTkFrame(panel, fg_color="transparent")
         buttons.pack(fill="x", pady=(16, 0))
 
         def accept() -> None:
-            result[0] = entry.get().strip()
+            name = entry.get().strip()
+            result[0] = (name, chosen[0] if color_widgets and chosen else None)
             top.destroy()
 
         def cancel() -> None:
@@ -678,6 +719,94 @@ class HabitApp(ctk.CTk):
         self.wait_window(top)
         return result[0]
 
+    def _build_color_picker(self, panel, initial: str, chosen: list[str]) -> list:
+        """Palette swatches plus a hex field, written into ``chosen``.
+
+        The swatches start from the standard palette; the hex field lets the
+        user pick any color they like, and a swatch updates as they type.
+        """
+        chosen[0] = initial
+        created: list = []
+
+        ctk.CTkLabel(
+            panel,
+            text="Color",
+            font=ctk.CTkFont(size=13, weight="bold"),
+            text_color=C_MUTED,
+        ).pack(anchor="w", pady=(14, 6))
+
+        # --- swatches ---
+        swatch_row = ctk.CTkFrame(panel, fg_color="transparent")
+        swatch_row.pack(anchor="w")
+
+        selection = ctk.CTkFrame(
+            panel, width=26, height=26, corner_radius=13, fg_color=initial
+        )
+        swatches: list = []
+
+        def refresh_selection() -> None:
+            """Repaint the preview and mark which swatch is active."""
+            selection.configure(fg_color=chosen[0])
+            selection.pack(side="right", padx=(10, 0))
+            for color, swatch in swatches:
+                swatch.configure(border_width=3 if color == chosen[0] else 0)
+
+        for color in PALETTE:
+            swatch = ctk.CTkButton(
+                swatch_row,
+                text="",
+                width=26,
+                height=26,
+                corner_radius=13,
+                fg_color=color,
+                hover_color=_lighten(color, 0.12),
+                border_width=0,
+                command=lambda c=color: self._pick_color(c, chosen, hex_var, refresh_selection),
+            )
+            swatch.pack(side="left", padx=(0, 6))
+            swatches.append((color, swatch))
+            created.append(swatch)
+
+        # --- custom hex ---
+        hex_row = ctk.CTkFrame(panel, fg_color="transparent")
+        hex_row.pack(anchor="w", pady=(10, 0))
+
+        hex_var = tk.StringVar(value=initial)
+        hex_entry = ctk.CTkEntry(
+            hex_row,
+            width=110,
+            height=28,
+            textvariable=hex_var,
+            font=ctk.CTkFont(size=12),
+        )
+        hex_entry.pack(side="left")
+        hex_entry.bind("<FocusOut>", lambda _e: self._apply_hex(hex_var, chosen, refresh_selection))
+        hex_entry.bind("<Return>", lambda _e: self._apply_hex(hex_var, chosen, refresh_selection))
+        created.append(hex_entry)
+
+        ctk.CTkLabel(
+            hex_row,
+            text="any hex, e.g. #4C8DFF",
+            font=ctk.CTkFont(size=11),
+            text_color=C_MUTED,
+        ).pack(side="left", padx=(8, 0))
+
+        refresh_selection()
+        return created
+
+    def _apply_hex(self, hex_var, chosen: list[str], refresh) -> None:
+        """Adopt a typed hex value if it is valid, else leave it untouched."""
+        candidate = normalize_color(hex_var.get(), chosen[0])
+        if candidate != chosen[0]:
+            chosen[0] = candidate
+            hex_var.set(candidate)
+        refresh()
+
+    def _pick_color(self, color: str, chosen: list[str], hex_var, refresh) -> None:
+        chosen[0] = color
+        hex_var.set(color)
+        refresh()
+
     # ---------------------------------------------------------- saving
 
     def _schedule_save(self) -> None:
@@ -709,7 +838,7 @@ class HabitApp(ctk.CTk):
 
 
 def _lighten(hex_color: str, amount: float) -> str:
-    """Lighten a #rrggbb colour by `amount` (0-1). Used for hover states."""
+    """Lighten a #rrggbb color by `amount` (0-1). Used for hover states."""
     hex_color = hex_color.lstrip("#")
     r, g, b = (int(hex_color[i : i + 2], 16) for i in (0, 2, 4))
     r = min(255, int(r + (255 - r) * amount))

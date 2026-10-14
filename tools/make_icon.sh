@@ -31,7 +31,7 @@ echo "using source: $SRC ($(file -b "$SRC" | cut -d, -f1))"
 rm -rf "$ICONSET" "$OUT"
 mkdir -p "$ICONSET"
 
-# Normalise to a real 1024px PNG master first. Explicitly setting the format
+# Normalize to a real 1024px PNG master first. Explicitly setting the format
 # means every intermediate file is genuine PNG data regardless of the source,
 # and 1024px means each output size is downscaled rather than upscaled.
 MASTER="$(mktemp -t habittracker_icon)"

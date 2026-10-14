@@ -7,7 +7,8 @@ Habits are laid out as a month calendar — one row per habit, one column per da
 ## Features
 
 - Month grid with click-to-toggle day cells
-- Add, rename and delete habits (delete asks for confirmation)
+- Add, edit and delete habits — one **Edit** dialog covers name and color (delete asks for confirmation)
+- Per-habit color, picked from a palette of swatches or typed as any hex value
 - Current streak and longest-ever streak per habit
 - Previous / next month navigation and a `Today` jump
 - Dark / light theme toggle
@@ -117,5 +118,6 @@ Makefile                    setup / run / icon / build / install / clean
 
 - Day cells in the future, or before a habit was created, are dimmed and not clickable.
 - Each habit shows two badges: its current streak (`5d`) and its longest streak ever (`best 12d`). The current streak survives an unticked today, and only breaks once a whole day is missed.
+- Habits are auto-assigned the least-used color from the palette. Use **Edit** on a habit row to change its name and color together — pick from the swatches or type any hex value such as `#4C8DFF`. **Delete** removes it.
 - Toggling a day saves after a short debounce rather than on every click.
 - The window auto-sizes so a full 31-day month is never squeezed.

@@ -37,7 +37,7 @@ def empty_payload() -> dict:
 
 
 def _coerce(raw: object) -> dict:
-    """Normalise loaded JSON into the expected shape, dropping junk."""
+    """Normalize loaded JSON into the expected shape, dropping junk."""
     if not isinstance(raw, dict):
         return empty_payload()
 

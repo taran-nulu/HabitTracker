@@ -8,7 +8,7 @@ from datetime import date, timedelta
 
 from . import storage
 
-# Accent colours cycled through when the user does not pick one.
+# Accent colors cycled through when the user does not pick one.
 PALETTE = [
     "#4C8DFF",  # blue
     "#22B07D",  # green
@@ -21,6 +21,24 @@ PALETTE = [
     "#F0743B",  # orange
     "#5A6B8C",  # slate
 ]
+
+
+def _is_hex_color(value: str) -> bool:
+    """True for a #rrggbb color, which is what Tk widgets accept."""
+    if not isinstance(value, str) or not value.startswith("#"):
+        return False
+    return len(value) == 7 and all(c in "0123456789abcdefABCDEF" for c in value[1:])
+
+
+def normalize_color(value: str | None, fallback: str) -> str:
+    """Coerce a stored/user color to #rrggbb, falling back when invalid."""
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate.startswith("#"):
+            candidate = "#" + candidate
+        if _is_hex_color(candidate):
+            return candidate.upper()
+    return fallback
 
 
 @dataclass
@@ -61,9 +79,7 @@ class Store:
             except ValueError:
                 created = date.today()
 
-            color = item.get("color")
-            if not color:
-                color = self._next_color()
+            color = normalize_color(item.get("color"), self._next_color())
 
             self.habits.append(
                 Habit(id=item["id"], name=item["name"], color=color, created=created)
@@ -87,7 +103,7 @@ class Store:
     # --------------------------------------------------------------- habits
 
     def _next_color(self) -> str:
-        """Pick a palette colour that is least used so far."""
+        """Pick a palette color that is least used so far."""
         used = [h.color for h in self.habits]
         counts = {c: used.count(c) for c in PALETTE}
         return min(counts, key=lambda c: counts[c])
@@ -99,7 +115,9 @@ class Store:
         habit = Habit(
             id=uuid.uuid4().hex,
             name=name,
-            color=color or self._next_color(),
+            # No color given, or an unusable one, falls back to the automatic
+            # least-used palette entry.
+            color=normalize_color(color, self._next_color()),
             created=date.today(),
         )
         self.habits.append(habit)
@@ -119,6 +137,19 @@ class Store:
         if not name:
             raise ValueError("Habit name cannot be empty")
         habit.name = name
+
+    def set_color(self, habit_id: str, color: str) -> None:
+        """Change a habit's accent color.
+
+        Accepts any #rrggbb value so the user is not restricted to the
+        built-in palette; falls back to automatic assignment if invalid.
+        """
+        habit = self.get(habit_id)
+        if habit is None:
+            raise ValueError("Unknown habit")
+        if not _is_hex_color(color):
+            raise ValueError("Color must be a hex value like #4C8DFF")
+        habit.color = color
 
     def delete_habit(self, habit_id: str) -> None:
         """Remove a habit and its completion history."""
